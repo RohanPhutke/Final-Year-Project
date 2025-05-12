@@ -1,0 +1,132 @@
+# Federated Learning for Hierarchical Fall Detection and Human Activity Recognition
+
+## Contents
+1. [Overview](#overview)
+2. [Dataset](#dataset)
+3. [Methodology](#methodology)
+4. [Repository Structure](#repository-structure)
+5. [Program Usage](#program-usage)
+6. [Citation](#citation)
+7. [Contact](#contact)
+
+## Overview
+This project provides the implementation for the paper, *[Federated Learning for Hierarchical Fall Detection and Human Activity Recognition](https://doi.org/10.1109/WF-IoT62078.2024.10811273)*, which  presents a federated learning framework for enhanced healthcare monitoring using a hierarchical two-stage approach for precise fall detection and human activity recognition.
+
+The first stage involves binary classification for fall detection, to distinguish between fall and non-fall events. Subsequently, the second stage involves multi-class classification for precise human activity recognition, depending on the results of the first stage. If a fall is detected, the system classifies the type of fall to facilitate appropriate medical responses; if no fall is detected, it classifies the specific activity being performed. 
+
+We evaluate each model's performance for the binary classification of fall and non-fall events, as well as for multi-class classification of time-series sensor readings, into 19 distinct scenarios, as prescribed by the dataset used. An LSTM model is used for both approaches, with standardised model hyperparameters.
+
+## Dataset
+The fall detection dataset is derived from the [*Heart Rate and IMU Sensor Data for Fall Detection*](https://github.com/nhoyh/hr_imu_falldetection_dataset) dataset published by Nho, Lim & Kwon ([2020](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8970371)). 
+
+The dataset captures 19 unique scenarios (classifiable under `fall` and `non-fall`) and sensor readings, as denoted below:
+
+<ins>Scenarios</ins>
+- `fall` class
+    - `fall1`: Clockwise forward fall
+    - `fall2`: Clocklwise backward fall
+    - `fall3`: Right to left lateral fall
+    - `fall4`: Counterclock-wise forward fall
+    - `fall5`: Counterclock-wise backward fall
+    - `fall6`: Left to right lateral fall
+- `non-fall` class
+    - `bed`: Lying down and up on the bed
+    - `chair`: Sitting down and up
+    - `clap`: Hitting the sensor
+    - `cloth`: Wearing a cloth
+    - `eat`: Eating
+    - `hair`: Brushing the hair
+    - `shoe`: Tying a shoelace
+    - `stair`: Climbing up and down on stairs
+    - `teeth`: Brushing teeth
+    - `walk`: Walking
+    - `wash`: Washing
+    - `write`: Writing
+    - `zip`: Rapidly zipping up and down
+
+<ins>Sensor Readings</ins>
+- `ax`: x axis of accelerometer signal (g)
+- `ay`: y axis of accelerometer signal (g)
+- `az`: z axis of accelerometer signal (g)
+- `w`: quaternion of gyroscope
+- `x`: quaternion of gyroscope
+- `y`: quaternion of gyroscope
+- `z`: quaternion of gyroscope
+- `droll`: angular velocity of gyroscope
+- `dpitch`: angular velocity of gyroscope
+- `dyaw`: angular velocity of gyroscope
+- `heart`: PPG sensor
+- `time`: Real time 
+
+## Methodology
+The following methodology was employed for our experiments:
+1. Data Pre-processing and Preparation 
+    - Preliminary Exploratory Data Analysis
+    - Dataset Construction
+2. Training of Comparative Model
+3. Training of Federated Models (Local and Global)
+3. Analysis
+    - Model Performance Comparison and Analysis
+
+## Repository Structure
+```
+/dataset (contains fall-detection dataset files, and associated Python notebooks)
+    comparative_model.ipynb
+    eda_preprocessing.ipynb
+    config.py
+    utils.py
+
+/results (contains results of federated learning)
+
+config.py (configuration file)
+
+utils (utility functions)
+
+run.py (main source code)
+
+requirements.txt
+
+README.md (this file)
+```
+
+## Program Usage
+1. Create a Python `virtualenv` on your local environment and activate it:
+    ```
+    python3 -m venv .venv
+
+    source .venv/bin/activate
+    ```
+2. Install the necessary project dependencies:
+    ```
+    pip3 install -r requirements.txt
+    ```
+3. To view or preprocess the dataset, run the [`eda_preprocessing.ipynb`](./dataset/eda_preprocessing.ipynb) notebook, ensuring that you've linked the notebook to the correct Python `virtualenv`. 
+
+4. To run the comparative model, run the [`comparative_model.ipynb`](./dataset/comparative_model.ipynb) notebook, ensuring that you've linked the notebook to the correct Python `virtualenv`. 
+
+5. To perform the federated learning experiment, run the following command:
+    ```
+    # For regular federated averaging (FedAvg)
+    python3 run.py
+
+    # For FedProx
+    python3 run.py --fedprox
+    ```
+
+## Citation
+If you find our work useful for your research, please consider citing the following paper:
+```
+@inproceedings{afandy2024web,
+  title     = {Federated Learning for Hierarchical Fall Detection and Human Activity Recognition},
+  author    = {Peter Febrianto Afandy, Ng Pai Chet, and Konstantinos N. Plataniotis},
+  booktitle = {Proceedings of the 2024 IEEE 10th World Forum on Internet of Things (WF-IoT)},
+  year      = {2024},
+  publisher = {IEEE},
+  url       = {https://doi.org/10.1109/WF-IoT62078.2024.10811273}
+  doi       = {10.1109/WF-IoT62078.2024.10811273},
+}
+
+```
+
+## Contact
+For more information, kindly contact [Dr Ng Pai Chet](mailto:paichet.ng@singaporetech.edu.sg).
