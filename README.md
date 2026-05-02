@@ -10,7 +10,7 @@
 7. [Contact](#contact)
 
 ## Overview
-This project provides the implementation for the paper, *[Federated Learning for Hierarchical Fall Detection and Human Activity Recognition](https://doi.org/10.1109/WF-IoT62078.2024.10811273)*, which  presents a federated learning framework for enhanced healthcare monitoring using a hierarchical two-stage approach for precise fall detection and human activity recognition.
+This project provides the implementation for Federated Learning for Hierarchical Fall Detection and Human Activity Recognition, which  presents a federated learning framework for enhanced healthcare monitoring using a hierarchical two-stage approach for precise fall detection and human activity recognition.
 
 The first stage involves binary classification for fall detection, to distinguish between fall and non-fall events. Subsequently, the second stage involves multi-class classification for precise human activity recognition, depending on the results of the first stage. If a fall is detected, the system classifies the type of fall to facilitate appropriate medical responses; if no fall is detected, it classifies the specific activity being performed. 
 
@@ -112,21 +112,3 @@ README.md (this file)
     # For FedProx
     python3 run.py --fedprox
     ```
-
-## Citation
-If you find our work useful for your research, please consider citing the following paper:
-```
-@inproceedings{afandy2024web,
-  title     = {Federated Learning for Hierarchical Fall Detection and Human Activity Recognition},
-  author    = {Peter Febrianto Afandy, Ng Pai Chet, and Konstantinos N. Plataniotis},
-  booktitle = {Proceedings of the 2024 IEEE 10th World Forum on Internet of Things (WF-IoT)},
-  year      = {2024},
-  publisher = {IEEE},
-  url       = {https://doi.org/10.1109/WF-IoT62078.2024.10811273}
-  doi       = {10.1109/WF-IoT62078.2024.10811273},
-}
-
-```
-
-## Contact
-For more information, kindly contact [Dr Ng Pai Chet](mailto:paichet.ng@singaporetech.edu.sg).
