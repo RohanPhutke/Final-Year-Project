@@ -78,15 +78,36 @@ The following methodology was employed for our experiments:
 
 /results (contains results of federated learning)
 
-config.py (configuration file)
+/docker (Dockerfiles and requirements for real-time pipeline)
+    edge_client/Dockerfile
+    spark/Dockerfile
+    requirements.txt
+/edge_client (IMU data simulator)
+    imu_simulator.py
+/spark_job (Spark inference job)
+    spark_inference.py
+/model (pre-trained model)
+/output (inference results)
 
-utils (utility functions)
+docker-compose.yml (orchestrates all services)
 
-run.py (main source code)
+## Real-Time Ingestion & Inference Pipeline (Dockerized)
+This project supports a real-time ingestion and inference pipeline using Docker Compose, Apache Kafka, Apache Spark, and simulated edge clients.
 
-requirements.txt
+### How it works
+- **Edge client(s)** stream IMU data to Kafka topics.
+- **Spark Structured Streaming job** consumes data from Kafka, runs model inference, and writes results to `output/results.txt`.
+- All services run as Docker containers for easy deployment and reproducibility.
 
-README.md (this file)
+### Quickstart
+1. Place your trained PyTorch model in `model/model.pth`.
+2. Build and start the pipeline:
+   ```sh
+   docker-compose up --build
+   ```
+3. Monitor real-time inference results in `output/results.txt`.
+
+See the `docker/` and `edge_client/` folders for configuration and code details.
 ```
 
 ## Program Usage

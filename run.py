@@ -193,6 +193,8 @@ def main(args):
     # Export results
     with open(f"{save_path}/results.json", 'w') as json_file:
         json.dump(overall_results, json_file, indent=4)
+    
+    torch.save(global_model.state_dict(), f"./model/federated_global_model.pth")
 
         
 # Program entrypoint

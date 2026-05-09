@@ -1,6 +1,84 @@
-.venv
-__pycache__
-*/.DS_Store
-data/
+# ========================
+# Python
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# ========================
+# Jupyter Notebooks
+# ========================
+.ipynb_checkpoints/
+
+# ========================
+# ML Model files (reproducible by training)
+# ========================
+*.pth
+*.pkl
+*.pt
+*.h5
+*.onnx
+*.weights
+*.bin
+*.safetensors
+model/
+
+# ========================
+# Exported / serialized data (reproducible)
+# ========================
+export/
+
+# ========================
+# Training results & outputs (reproducible by re-running)
+# ========================
+results/
+output/
 log/
+logs/
+
+# ========================
+# Spark artifacts
+# ========================
+_spark_metadata/
+spark-warehouse/
+derby.log
+metastore_db/
+
+# ========================
+# macOS
+# ========================
+.DS_Store
+**/.DS_Store
+
+# ========================
+# IDE / Editor
+# ========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ========================
+# Environment & secrets
+# ========================
+.env
+.env.*
+
+# ========================
+# Misc
+# ========================
+*.log
+data/
 result/
