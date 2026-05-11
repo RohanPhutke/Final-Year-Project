@@ -139,7 +139,7 @@ def process_batch(batch_df, batch_id, model, spark):
                   f"{icon} {pred_label} (conf: {confidence:.4f}) "
                   f"[truth: {ground_truth_label}]")
 
-            results.append({
+            result = {
                 'subject_id': subject_id,
                 'scenario': scenario,
                 'num_timesteps': num_timesteps,
@@ -151,7 +151,13 @@ def process_batch(batch_df, batch_id, model, spark):
                 'correct': correct,
                 'inference_timestamp': time.time(),
                 'send_timestamp': send_timestamp,
-            })
+            }
+
+            # Include raw sensor data for fall predictions (needed for severity analysis + RAG)
+            if is_fall:
+                result['sensor_data'] = features_data
+
+            results.append(result)
 
         except Exception as e:
             print(f"  [✗] Error processing message: {e}")
@@ -159,12 +165,13 @@ def process_batch(batch_df, batch_id, model, spark):
             traceback.print_exc()
 
     if results:
-        # Write results to CSV
-        results_df = spark.createDataFrame(results)
+        # Write results to CSV (exclude sensor_data — CSV can't handle nested arrays)
+        csv_results = [{k: v for k, v in r.items() if k != 'sensor_data'} for r in results]
+        results_df = spark.createDataFrame(csv_results)
         results_df.write.mode("append").option("header", "true").csv(OUTPUT_PATH)
         print(f"  [✓] Wrote {len(results)} predictions to {OUTPUT_PATH}")
 
-        # Also write to Kafka predictions topic (for dashboard integration)
+        # Write full results (including sensor_data for falls) to Kafka predictions topic
         try:
             for r in results:
                 result_row = spark.createDataFrame([{'value': json.dumps(r)}])
@@ -172,6 +179,7 @@ def process_batch(batch_df, batch_id, model, spark):
                     .format("kafka") \
                     .option("kafka.bootstrap.servers", KAFKA_BROKER) \
                     .option("topic", OUTPUT_TOPIC) \
+                    .option("kafka.max.request.size", "10485760") \
                     .save()
         except Exception as e:
             print(f"  [⚠] Could not write to Kafka '{OUTPUT_TOPIC}' topic: {e}")

@@ -36,6 +36,8 @@ services:
     depends_on:
       - spark-master
 
+  # ── Step 1: Edge Client (Rohan) ─────────────────────────────────
+  # Reads real .mat sensor data and streams to Kafka
   edge_client:
     build:
       context: .
@@ -50,9 +52,9 @@ services:
       - DATASET_DIR=/app/dataset
       - SEND_INTERVAL=3
     restart: on-failure
-    networks:
-      - default
 
+  # ── Step 1: Spark Inference Job (Rohan) ─────────────────────────
+  # Runs trained LSTM model on sensor windows, writes predictions to Kafka
   spark-job:
     build:
       context: .
@@ -70,8 +72,34 @@ services:
       - OUTPUT_PATH=/app/output/stream_results
       - MODEL_PATH=/app/model/model.pth
     restart: on-failure
-    networks:
-      - default
+
+  # ── Step 2: Dashboard Server (Agatsya + Bridge) ─────────────────
+  # Flask backend serving the monitoring UI with RAG triage support
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/dashboard/Dockerfile
+    ports:
+      - "5050:5050"
+    environment:
+      - FLASK_ENV=production
+    restart: on-failure
+
+  # ── Bridge: Kafka → Dashboard (Connection Layer) ────────────────
+  # Consumes Spark predictions from Kafka, runs severity analysis + RAG,
+  # and pushes real-time alerts to the dashboard API
+  kafka-bridge:
+    build:
+      context: .
+      dockerfile: docker/bridge/Dockerfile
+    depends_on:
+      - kafka
+      - dashboard
+    environment:
+      - KAFKA_BROKER=kafka:9092
+      - PREDICTIONS_TOPIC=predictions
+      - DASHBOARD_URL=http://dashboard:5050
+    restart: on-failure
 
 networks:
   default:

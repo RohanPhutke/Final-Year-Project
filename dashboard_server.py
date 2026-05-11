@@ -92,13 +92,58 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/api/alerts", methods=["GET"])
-def get_alerts():
-    """Return all stored alerts."""
-    return jsonify({
-        "alerts": [a["summary"] for a in alerts_store],
-        "count": len(alerts_store),
-    })
+@app.route("/api/alerts", methods=["GET", "POST"])
+def handle_alerts():
+    """
+    GET:  Return all stored alerts.
+    POST: Accept a real fall alert from the Kafka bridge (with severity + triage data).
+    """
+    if request.method == "GET":
+        return jsonify({
+            "alerts": [a["summary"] for a in alerts_store],
+            "count": len(alerts_store),
+        })
+
+    # POST — real alert from kafka_to_dashboard bridge
+    body = request.get_json(silent=True) or {}
+    subject_id = body.get("subject_id", "unknown")
+    scenario = body.get("scenario", "unknown")
+    confidence = body.get("confidence", 0.0)
+    severity_data = body.get("severity_analysis", {})
+    triage_data = body.get("triage_brief", None)
+
+    severity = severity_data.get("severity", "MEDIUM") if severity_data else "MEDIUM"
+    impact_type = severity_data.get("impact_type", "unknown") if severity_data else "unknown"
+    fall_type = severity_data.get("fall_type", scenario) if severity_data else scenario
+
+    alert_id = f"FALL-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{len(alerts_store)+1:03d}"
+
+    alert_record = {
+        "summary": {
+            "alert_id": alert_id,
+            "timestamp": datetime.now().isoformat(),
+            "subject_id": subject_id,
+            "fall_type": fall_type,
+            "severity": severity,
+            "impact_type": impact_type,
+            "lateral_g": severity_data.get("lateral_g", 0.0),
+            "rotation_speed": severity_data.get("rotation_speed", 0.0),
+            "heart_rate_delta": severity_data.get("heart_rate_delta", 0.0),
+            "impact_direction": severity_data.get("impact_direction", "unknown"),
+            "trigger_rag": severity_data.get("trigger_rag", False),
+            "confidence": confidence,
+            "source": "kafka_stream",
+        },
+        "severity_analysis": severity_data,
+        "triage_brief": triage_data,
+    }
+
+    alerts_store.insert(0, alert_record)
+
+    print(f"[{'🔴' if severity == 'HIGH' else '🟡' if severity == 'MEDIUM' else '🟢'}] "
+          f"Real alert: {subject_id}/{scenario} → {severity} ({impact_type})")
+
+    return jsonify(alert_record), 201
 
 
 @app.route("/api/alerts/<alert_id>", methods=["GET"])
@@ -164,6 +209,7 @@ def simulate_alert():
             "heart_rate_delta": severity_result.heart_rate_delta,
             "impact_direction": severity_result.impact_direction,
             "trigger_rag": severity_result.trigger_rag,
+            "source": "simulation",
         },
         "severity_analysis": severity_result.to_dict(),
         "triage_brief": triage_dict,
