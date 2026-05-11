@@ -1,135 +1,129 @@
-# Federated Learning for Hierarchical Fall Detection and Human Activity Recognition
+# FL-Fall-Detection: Real-Time Privacy-Preserving Fall Detection System
 
-## Contents
-1. [Overview](#overview)
-2. [Dataset](#dataset)
-3. [Methodology](#methodology)
-4. [Repository Structure](#repository-structure)
-5. [Program Usage](#program-usage)
-6. [Citation](#citation)
-7. [Contact](#contact)
+This repository hosts a production-ready, distributed, privacy-preserving machine learning framework designed for healthcare monitoring. It processes time-series data from wearable devices (accelerometers, gyroscopes, and heart rate sensors) to interpret physical movements and detect falls in real-time.
 
-## Overview
-This project provides the implementation for Federated Learning for Hierarchical Fall Detection and Human Activity Recognition, which  presents a federated learning framework for enhanced healthcare monitoring using a hierarchical two-stage approach for precise fall detection and human activity recognition.
+## What This Project Achieves
 
-The first stage involves binary classification for fall detection, to distinguish between fall and non-fall events. Subsequently, the second stage involves multi-class classification for precise human activity recognition, depending on the results of the first stage. If a fall is detected, the system classifies the type of fall to facilitate appropriate medical responses; if no fall is detected, it classifies the specific activity being performed. 
+Originally an offline script for a Federated Learning experiment, this project has been elevated into a robust, end-to-end distributed software system. It achieves its goals through three main pillars:
 
-We evaluate each model's performance for the binary classification of fall and non-fall events, as well as for multi-class classification of time-series sensor readings, into 19 distinct scenarios, as prescribed by the dataset used. An LSTM model is used for both approaches, with standardised model hyperparameters.
+### 1. Real-Time Distributed Ingestion & Inference
+Instead of reading static datasets, the system simulates a pervasive mobile computing environment.
+- **Edge Clients**: Continuously stream high-frequency telemetry (IMU sensor data) from multiple subjects to an Apache Kafka queue.
+- **Spark Streaming**: Consumes these sliding time-windows in real-time, loading a pre-trained Two-Stage Federated LSTM model to classify activities and detect falls on the fly.
 
-## Dataset
-The fall detection dataset is derived from the [*Heart Rate and IMU Sensor Data for Fall Detection*](https://github.com/nhoyh/hr_imu_falldetection_dataset) dataset published by Nho, Lim & Kwon ([2020](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8970371)). 
+### 2. Low-Latency Monitoring Dashboard
+A comprehensive full-stack interface (Flask/HTML/JS) provides a concurrent, fault-tolerant dashboard.
+- **Kafka Bridge**: A dedicated service consumes predictions from Spark. When a fall is detected, it runs a **Severity Analysis** (calculating lateral G-force, rotation speed, jerk, and heart rate spikes) to determine if the impact was severe.
+- **Real-Time Alerts**: Severe events are pushed instantly to the monitoring dashboard, allowing observers to track system events without lag.
 
-The dataset captures 19 unique scenarios (classifiable under `fall` and `non-fall`) and sensor readings, as denoted below:
+### 3. Contextual First-Response Pipeline (RAG)
+Going beyond just classification, the system features an AI-powered triage pipeline.
+- When a severe lateral impact is flagged, a Retrieval-Augmented Generation (RAG) pipeline is triggered.
+- It queries a ChromaDB knowledge base loaded with medical protocols (e.g., Canadian CT Head Rule, NEXUS criteria, Hip X-Ray indications).
+- The dashboard immediately surfaces a **Contextual Triage Brief**, providing immediate, context-aware support for medical officers handling the alert.
 
-<ins>Scenarios</ins>
-- `fall` class
-    - `fall1`: Clockwise forward fall
-    - `fall2`: Clocklwise backward fall
-    - `fall3`: Right to left lateral fall
-    - `fall4`: Counterclock-wise forward fall
-    - `fall5`: Counterclock-wise backward fall
-    - `fall6`: Left to right lateral fall
-- `non-fall` class
-    - `bed`: Lying down and up on the bed
-    - `chair`: Sitting down and up
-    - `clap`: Hitting the sensor
-    - `cloth`: Wearing a cloth
-    - `eat`: Eating
-    - `hair`: Brushing the hair
-    - `shoe`: Tying a shoelace
-    - `stair`: Climbing up and down on stairs
-    - `teeth`: Brushing teeth
-    - `walk`: Walking
-    - `wash`: Washing
-    - `write`: Writing
-    - `zip`: Rapidly zipping up and down
+---
 
-<ins>Sensor Readings</ins>
-- `ax`: x axis of accelerometer signal (g)
-- `ay`: y axis of accelerometer signal (g)
-- `az`: z axis of accelerometer signal (g)
-- `w`: quaternion of gyroscope
-- `x`: quaternion of gyroscope
-- `y`: quaternion of gyroscope
-- `z`: quaternion of gyroscope
-- `droll`: angular velocity of gyroscope
-- `dpitch`: angular velocity of gyroscope
-- `dyaw`: angular velocity of gyroscope
-- `heart`: PPG sensor
-- `time`: Real time 
+## Architecture Overview
 
-## Methodology
-The following methodology was employed for our experiments:
-1. Data Pre-processing and Preparation 
-    - Preliminary Exploratory Data Analysis
-    - Dataset Construction
-2. Training of Comparative Model
-3. Training of Federated Models (Local and Global)
-3. Analysis
-    - Model Performance Comparison and Analysis
-
-## Repository Structure
+```mermaid
+graph TD
+    A[Edge Client<br/>Reads real .mat data] -->|Kafka 'imu-data'| B[Spark Inference<br/>LSTM Model]
+    B -->|Kafka 'predictions'| C[Kafka-to-Dashboard Bridge<br/>Consumer]
+    
+    C -->|If Fall Detected| D{Severity Analyzer}
+    D -->|If HIGH Severity| E[RAG Pipeline]
+    E -->|Retrieve Context| F[(ChromaDB Knowledge Base)]
+    
+    D -->|POST /api/alerts| G[Dashboard API]
+    E -->|Triage Brief| G
+    
+    G --> H[Live Dashboard<br/>http://localhost:5050]
 ```
-/dataset (contains fall-detection dataset files, and associated Python notebooks)
-    comparative_model.ipynb
-    eda_preprocessing.ipynb
-    config.py
-    utils.py
 
-/results (contains results of federated learning)
+---
 
-/docker (Dockerfiles and requirements for real-time pipeline)
-    edge_client/Dockerfile
-    spark/Dockerfile
-    requirements.txt
-/edge_client (IMU data simulator)
-    imu_simulator.py
-/spark_job (Spark inference job)
-    spark_inference.py
-/model (pre-trained model)
-/output (inference results)
+## Prerequisites
 
-docker-compose.yml (orchestrates all services)
+- **Docker** and **Docker Compose** installed on your machine.
+- Minimum 8GB RAM allocated to Docker (Spark and Kafka can be memory intensive).
+- A `.mat` sensor dataset located in the `dataset/` directory.
+- The pre-trained PyTorch model located at `model/model.pth`.
 
-## Real-Time Ingestion & Inference Pipeline (Dockerized)
-This project supports a real-time ingestion and inference pipeline using Docker Compose, Apache Kafka, Apache Spark, and simulated edge clients.
+---
 
-### How it works
-- **Edge client(s)** stream IMU data to Kafka topics.
-- **Spark Structured Streaming job** consumes data from Kafka, runs model inference, and writes results to `output/results.txt`.
-- All services run as Docker containers for easy deployment and reproducibility.
+## Setup & How to Run
 
-### Quickstart
-1. Place your trained PyTorch model in `model/model.pth`.
-2. Build and start the pipeline:
-   ```sh
-   docker-compose up --build
+The entire infrastructure has been containerized into a single Docker Compose stack, requiring zero manual configuration of Kafka or Spark.
+
+### 1. Build the Infrastructure
+From the root of the project, build the 4 custom Docker images (Edge Client, Spark Job, Dashboard, and Kafka Bridge):
+```bash
+docker compose build
+```
+*(Note: During the build process, the knowledge base will automatically be chunked and embedded into a local ChromaDB instance via TF-IDF).*
+
+### 2. Start the Pipeline
+Bring up the entire 7-service stack in detached mode:
+```bash
+docker compose up -d
+```
+This will start:
+- `kafka` (Message broker)
+- `spark-master` & `spark-worker` (Inference engine)
+- `edge_client` (Data ingestion)
+- `spark-job` (Streaming inference)
+- `dashboard` (Flask web server)
+- `kafka-bridge` (Severity analysis & RAG pipeline)
+
+### 3. View the Dashboard
+Open your web browser and navigate to:
+**http://localhost:5050**
+
+You will see the Fall Detection Command dashboard.
+
+### 4. Stopping the Pipeline
+To stop the services and clean up containers:
+```bash
+docker compose down
+```
+
+---
+
+## What to Verify
+
+Once the stack is running, you can verify the end-to-end functionality by watching the dashboard and logs:
+
+1. **Edge Client is Streaming**: 
+   Check the edge client logs to see it reading `.mat` files and sending data to Kafka.
+   ```bash
+   docker compose logs -f edge_client
    ```
-3. Monitor real-time inference results in `output/results.txt`.
+2. **Spark is Inferring**:
+   Check the Spark job logs to see the LSTM model making predictions on the incoming data.
+   ```bash
+   docker compose logs -f spark-job
+   ```
+3. **Bridge is Analyzing & Triage**:
+   Watch the bridge logs to see the Severity Analyzer and RAG pipeline working when a fall is detected.
+   ```bash
+   docker compose logs -f kafka-bridge
+   ```
+4. **Dashboard Alerts**:
+   On `http://localhost:5050`, you should see live alerts populating on the left panel.
+   - Click on an alert marked as **HIGH** severity.
+   - You should see a detailed **Contextual Triage Brief**, complete with Impact G-Forces, Recommended Imaging (e.g., X-Ray Pelvis [STAT]), and Retrieved Medical Context.
 
-See the `docker/` and `edge_client/` folders for configuration and code details.
-```
+---
 
-## Program Usage
-1. Create a Python `virtualenv` on your local environment and activate it:
-    ```
-    python3 -m venv .venv
+## Project Structure
 
-    source .venv/bin/activate
-    ```
-2. Install the necessary project dependencies:
-    ```
-    pip3 install -r requirements.txt
-    ```
-3. To view or preprocess the dataset, run the [`eda_preprocessing.ipynb`](./dataset/eda_preprocessing.ipynb) notebook, ensuring that you've linked the notebook to the correct Python `virtualenv`. 
-
-4. To run the comparative model, run the [`comparative_model.ipynb`](./dataset/comparative_model.ipynb) notebook, ensuring that you've linked the notebook to the correct Python `virtualenv`. 
-
-5. To perform the federated learning experiment, run the following command:
-    ```
-    # For regular federated averaging (FedAvg)
-    python3 run.py
-
-    # For FedProx
-    python3 run.py --fedprox
-    ```
+- `dataset/`: Contains raw sensor data and configuration (`config.py`).
+- `docker/`: Dockerfiles for the various microservices.
+- `edge_client/`: Simulates edge devices streaming data to Kafka.
+- `knowledge_base/`: Markdown files containing medical protocols and SOPs for the RAG pipeline.
+- `model/`: Directory for the pre-trained `model.pth`.
+- `spark_job/`: Spark Structured Streaming application for real-time PyTorch inference.
+- `dashboard_server.py` & `dashboard/`: The Flask web server and frontend UI.
+- `kafka_to_dashboard.py`: The bridge service linking Spark predictions to the Dashboard.
+- `severity_analyzer.py` & `rag_pipeline.py`: The intelligence layer for evaluating falls and querying the knowledge base.
