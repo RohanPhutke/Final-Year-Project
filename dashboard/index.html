@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fall Detection — RAG Triage Dashboard</title>
+    <meta name="description" content="Real-time fall detection dashboard with AI-powered triage support">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg-primary: #0a0e1a; --bg-secondary: #111827; --bg-card: #1a2035;
+            --bg-glass: rgba(26, 32, 53, 0.85); --border: rgba(255,255,255,0.06);
+            --text-primary: #f1f5f9; --text-secondary: #94a3b8; --text-muted: #64748b;
+            --accent: #6366f1; --accent-glow: rgba(99,102,241,0.3);
+            --red: #ef4444; --red-glow: rgba(239,68,68,0.25); --red-bg: rgba(239,68,68,0.1);
+            --yellow: #f59e0b; --yellow-bg: rgba(245,158,11,0.1);
+            --green: #22c55e; --green-bg: rgba(34,197,94,0.1);
+            --blue: #3b82f6; --radius: 16px; --radius-sm: 10px;
+        }
+        body { font-family:'Inter',system-ui,sans-serif; background:var(--bg-primary); color:var(--text-primary); min-height:100vh; overflow-x:hidden; }
+        /* Animated gradient bg */
+        body::before { content:''; position:fixed; inset:0; background:radial-gradient(ellipse at 20% 20%, rgba(99,102,241,0.08) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(239,68,68,0.05) 0%, transparent 50%); pointer-events:none; z-index:0; }
+        
+        /* Layout */
+        .app { position:relative; z-index:1; max-width:1440px; margin:0 auto; padding:24px; }
+        header { display:flex; justify-content:space-between; align-items:center; margin-bottom:28px; }
+        .logo { display:flex; align-items:center; gap:14px; }
+        .logo-icon { width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg,var(--accent),#8b5cf6); display:flex; align-items:center; justify-content:center; font-size:22px; box-shadow:0 0 24px var(--accent-glow); }
+        .logo h1 { font-size:22px; font-weight:700; background:linear-gradient(135deg,#f1f5f9,#94a3b8); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .logo p { font-size:12px; color:var(--text-muted); margin-top:2px; }
+        .header-status { display:flex; align-items:center; gap:16px; }
+        .status-badge { display:flex; align-items:center; gap:8px; padding:8px 16px; border-radius:20px; font-size:12px; font-weight:600; background:var(--bg-card); border:1px solid var(--border); }
+        .status-dot { width:8px; height:8px; border-radius:50%; animation:pulse-dot 2s ease-in-out infinite; }
+        .status-dot.online { background:var(--green); box-shadow:0 0 8px rgba(34,197,94,0.5); }
+        @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.85)} }
+
+        /* Simulate Button */
+        .btn { padding:10px 22px; border-radius:var(--radius-sm); font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; border:none; transition:all 0.2s; }
+        .btn-danger { background:linear-gradient(135deg,var(--red),#dc2626); color:#fff; box-shadow:0 4px 16px var(--red-glow); }
+        .btn-danger:hover { transform:translateY(-1px); box-shadow:0 6px 24px var(--red-glow); }
+        .btn-warning { background:linear-gradient(135deg,var(--yellow),#d97706); color:#000; }
+        .btn-secondary { background:var(--bg-card); color:var(--text-secondary); border:1px solid var(--border); }
+        .btn-secondary:hover { border-color:var(--accent); color:var(--text-primary); }
+        .btn:disabled { opacity:0.5; cursor:not-allowed; transform:none !important; }
+        .sim-controls { display:flex; gap:8px; flex-wrap:wrap; }
+
+        /* Grid */
+        .grid { display:grid; grid-template-columns:380px 1fr; gap:24px; }
+        @media(max-width:900px) { .grid { grid-template-columns:1fr; } }
+
+        /* Alert List */
+        .panel { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+        .panel-header { padding:18px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+        .panel-header h2 { font-size:15px; font-weight:700; }
+        .panel-header .count { font-size:12px; color:var(--text-muted); background:var(--bg-secondary); padding:3px 10px; border-radius:10px; }
+        .alert-list { max-height:calc(100vh - 220px); overflow-y:auto; }
+        .alert-list::-webkit-scrollbar { width:4px; }
+        .alert-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+        .alert-item { padding:16px 20px; border-bottom:1px solid var(--border); cursor:pointer; transition:all 0.15s; position:relative; }
+        .alert-item:hover { background:rgba(99,102,241,0.05); }
+        .alert-item.active { background:rgba(99,102,241,0.08); border-left:3px solid var(--accent); }
+        .alert-item.severity-HIGH { border-left:3px solid var(--red); }
+        .alert-item.severity-HIGH.active { border-left:3px solid var(--red); background:var(--red-bg); }
+        .alert-item.severity-MEDIUM { border-left:3px solid var(--yellow); }
+        .alert-item.severity-LOW { border-left:3px solid var(--green); }
+        .alert-meta { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+        .alert-subject { font-weight:700; font-size:14px; }
+        .alert-time { font-size:11px; color:var(--text-muted); }
+        .alert-desc { font-size:12px; color:var(--text-secondary); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+        .tag { padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; }
+        .tag-red { background:var(--red-bg); color:var(--red); }
+        .tag-yellow { background:var(--yellow-bg); color:var(--yellow); }
+        .tag-green { background:var(--green-bg); color:var(--green); }
+        .rag-badge { font-size:10px; background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(139,92,246,0.2)); color:#a78bfa; padding:2px 8px; border-radius:6px; font-weight:600; }
+
+        /* Detail Panel */
+        .detail-panel { display:flex; flex-direction:column; gap:20px; }
+        .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; height:400px; color:var(--text-muted); text-align:center; }
+        .empty-state .icon { font-size:48px; margin-bottom:16px; opacity:0.3; }
+        .empty-state p { font-size:14px; }
+
+        /* Triage Card */
+        .triage-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; animation:slideUp 0.3s ease; }
+        @keyframes slideUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+        .triage-header { padding:20px 24px; display:flex; justify-content:space-between; align-items:center; }
+        .triage-header.RED { background:linear-gradient(135deg, rgba(239,68,68,0.15), rgba(220,38,38,0.05)); border-bottom:1px solid rgba(239,68,68,0.2); }
+        .triage-header.YELLOW { background:linear-gradient(135deg, rgba(245,158,11,0.15), rgba(217,119,6,0.05)); border-bottom:1px solid rgba(245,158,11,0.2); }
+        .triage-header.GREEN { background:linear-gradient(135deg, rgba(34,197,94,0.15), rgba(22,163,74,0.05)); border-bottom:1px solid rgba(34,197,94,0.2); }
+        .triage-title-group h3 { font-size:17px; font-weight:800; margin-bottom:4px; }
+        .triage-title-group p { font-size:12px; color:var(--text-secondary); }
+        .triage-severity { font-size:28px; font-weight:900; }
+        .triage-severity.RED { color:var(--red); text-shadow:0 0 20px var(--red-glow); }
+        .triage-severity.YELLOW { color:var(--yellow); }
+        .triage-severity.GREEN { color:var(--green); }
+        .triage-body { padding:20px 24px; }
+
+        /* Metrics row */
+        .metrics { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px,1fr)); gap:12px; margin-bottom:20px; }
+        .metric { background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px; }
+        .metric-label { font-size:10px; text-transform:uppercase; letter-spacing:0.8px; color:var(--text-muted); margin-bottom:6px; font-weight:600; }
+        .metric-value { font-size:20px; font-weight:800; }
+        .metric-value.danger { color:var(--red); }
+        .metric-value.warning { color:var(--yellow); }
+        .metric-unit { font-size:11px; color:var(--text-muted); font-weight:400; }
+
+        /* Sections */
+        .section { margin-bottom:20px; }
+        .section-title { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+        .action-list { list-style:none; }
+        .action-list li { padding:10px 14px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom:6px; font-size:13px; line-height:1.5; color:var(--text-secondary); display:flex; gap:10px; align-items:flex-start; }
+        .action-list li .num { min-width:22px; height:22px; border-radius:6px; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; }
+
+        /* Injury grid */
+        .injury-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:12px; }
+        .injury-col h4 { font-size:12px; font-weight:700; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+        .injury-col h4 .dot { width:8px; height:8px; border-radius:50%; }
+        .injury-col ul { list-style:none; }
+        .injury-col li { font-size:12px; color:var(--text-secondary); padding:6px 10px; background:var(--bg-secondary); border-radius:6px; margin-bottom:4px; line-height:1.4; }
+
+        /* Imaging table */
+        .imaging-table { width:100%; border-collapse:collapse; font-size:12px; }
+        .imaging-table th { text-align:left; padding:10px 12px; background:var(--bg-secondary); color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; font-size:10px; }
+        .imaging-table td { padding:10px 12px; border-bottom:1px solid var(--border); color:var(--text-secondary); }
+        .imaging-table tr:hover td { background:rgba(99,102,241,0.03); }
+        .urgency-stat { color:var(--red); font-weight:700; }
+        .urgency-urgent { color:var(--yellow); font-weight:700; }
+        .urgency-routine { color:var(--green); font-weight:600; }
+
+        /* Transport bar */
+        .transport-bar { background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius-sm); padding:16px; display:flex; gap:16px; align-items:center; }
+        .transport-bar .icon { font-size:28px; }
+        .transport-bar .info h4 { font-size:14px; font-weight:700; margin-bottom:4px; }
+        .transport-bar .info p { font-size:12px; color:var(--text-secondary); line-height:1.5; }
+
+        /* Sources */
+        .sources { display:flex; flex-wrap:wrap; gap:6px; }
+        .source-chip { font-size:10px; padding:4px 10px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:20px; color:var(--text-muted); }
+
+        /* Retrieved context */
+        .context-toggle { font-size:12px; color:var(--accent); cursor:pointer; background:none; border:none; font-family:inherit; font-weight:600; padding:0; }
+        .context-toggle:hover { text-decoration:underline; }
+        .context-chunks { display:none; margin-top:10px; }
+        .context-chunks.visible { display:block; }
+        .chunk { background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px; margin-bottom:8px; font-size:11px; color:var(--text-muted); line-height:1.6; max-height:120px; overflow-y:auto; }
+        .chunk-source { font-size:10px; color:var(--accent); font-weight:600; margin-bottom:4px; }
+
+        /* Pulse animation for severe alerts */
+        @keyframes pulse-border { 0%,100%{box-shadow:0 0 0 0 var(--red-glow)} 50%{box-shadow:0 0 0 8px transparent} }
+        .triage-card.pulse { animation:pulse-border 2s ease-in-out 3; }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">🛡️</div>
+                <div>
+                    <h1>Fall Detection Command</h1>
+                    <p>RAG-Powered Triage Intelligence</p>
+                </div>
+            </div>
+            <div class="header-status">
+                <div class="status-badge"><div class="status-dot online"></div> System Online</div>
+                <div class="status-badge" id="kb-status">📚 KB: Loading...</div>
+                <div class="sim-controls">
+                    <button class="btn btn-danger" onclick="simulate('HIGH')" id="btn-sim-high">⚡ Simulate Severe Fall</button>
+                    <button class="btn btn-warning" onclick="simulate('MEDIUM')">Moderate</button>
+                    <button class="btn btn-secondary" onclick="simulate('LOW')">Low</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid">
+            <!-- Alert List -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>📋 Alerts</h2>
+                    <span class="count" id="alert-count">0</span>
+                </div>
+                <div class="alert-list" id="alert-list">
+                    <div class="empty-state" id="list-empty">
+                        <div class="icon">📡</div>
+                        <p>No alerts yet.<br>Click <strong>Simulate Severe Fall</strong> to test the RAG pipeline.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detail Panel -->
+            <div class="detail-panel" id="detail-panel">
+                <div class="panel" style="height:100%;">
+                    <div class="empty-state" id="detail-empty">
+                        <div class="icon">🔍</div>
+                        <p>Select an alert to view the<br>AI-generated triage brief</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+const API = '';
+let alertsData = [];
+let selectedId = null;
+
+// ── KB Status ──
+async function checkKB() {
+    try {
+        const r = await fetch(`${API}/api/knowledge/stats`);
+        const d = await r.json();
+        document.getElementById('kb-status').textContent = `📚 KB: ${d.document_chunks} chunks`;
+    } catch { document.getElementById('kb-status').textContent = '📚 KB: Offline'; }
+}
+checkKB();
+
+// ── Simulate ──
+async function simulate(severity) {
+    const btns = document.querySelectorAll('.sim-controls .btn');
+    btns.forEach(b => b.disabled = true);
+    try {
+        const r = await fetch(`${API}/api/alerts/simulate`, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({severity, fall_type_idx: severity==='HIGH'?5:severity==='MEDIUM'?6:16, subject_id:`subject_${Math.floor(Math.random()*21)+1}`})
+        });
+        const data = await r.json();
+        alertsData.unshift(data);
+        renderAlertList();
+        selectAlert(data.summary.alert_id);
+    } catch(e) { console.error(e); }
+    btns.forEach(b => b.disabled = false);
+}
+
+// ── Render Alert List ──
+function renderAlertList() {
+    const list = document.getElementById('alert-list');
+    if (alertsData.length === 0) return;
+    document.getElementById('alert-count').textContent = alertsData.length;
+
+    list.innerHTML = alertsData.map(a => {
+        const s = a.summary;
+        const tagClass = s.severity==='HIGH'?'tag-red':s.severity==='MEDIUM'?'tag-yellow':'tag-green';
+        const time = new Date(s.timestamp).toLocaleTimeString();
+        return `<div class="alert-item severity-${s.severity} ${selectedId===s.alert_id?'active':''}" onclick="selectAlert('${s.alert_id}')">
+            <div class="alert-meta"><span class="alert-subject">${s.subject_id}</span><span class="alert-time">${time}</span></div>
+            <div class="alert-desc">
+                <span class="tag ${tagClass}">${s.severity}</span>
+                <span>${s.fall_type} — ${s.impact_type}</span>
+                ${s.trigger_rag?'<span class="rag-badge">RAG ✦</span>':''}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ── Select & Render Detail ──
+function selectAlert(id) {
+    selectedId = id;
+    renderAlertList();
+    const alert = alertsData.find(a => a.summary.alert_id === id);
+    if (!alert) return;
+    const panel = document.getElementById('detail-panel');
+    const sev = alert.severity_analysis;
+    const tb = alert.triage_brief;
+
+    if (!tb) {
+        panel.innerHTML = renderNoTriageCard(alert);
+        return;
+    }
+    panel.innerHTML = renderTriageCard(alert, sev, tb);
+}
+
+function renderNoTriageCard(alert) {
+    const s = alert.summary;
+    return `<div class="triage-card">
+        <div class="triage-header ${s.severity==='MEDIUM'?'YELLOW':'GREEN'}">
+            <div class="triage-title-group"><h3>${s.severity} Alert — ${s.subject_id}</h3><p>${s.fall_type} • ${s.impact_type}</p></div>
+            <div class="triage-severity ${s.severity==='MEDIUM'?'YELLOW':'GREEN'}">${s.severity==='MEDIUM'?'⚠️':'✅'}</div>
+        </div>
+        <div class="triage-body">
+            <div class="metrics">
+                <div class="metric"><div class="metric-label">Lateral G</div><div class="metric-value">${s.lateral_g}<span class="metric-unit"> g</span></div></div>
+                <div class="metric"><div class="metric-label">Rotation</div><div class="metric-value">${s.rotation_speed}<span class="metric-unit"> rad/s</span></div></div>
+                <div class="metric"><div class="metric-label">HR Delta</div><div class="metric-value">${s.heart_rate_delta}<span class="metric-unit"> bpm</span></div></div>
+            </div>
+            <div class="section"><p style="color:var(--text-muted);font-size:13px;">Severity below threshold — RAG triage pipeline was not triggered. Standard monitoring protocols apply.</p></div>
+        </div>
+    </div>`;
+}
+
+function renderTriageCard(alert, sev, tb) {
+    const s = alert.summary;
+    const color = tb.triage_color || 'RED';
+    // Actions
+    const actionsHTML = (tb.immediate_actions||[]).map((a,i) => `<li><span class="num">${i+1}</span>${a}</li>`).join('');
+    // Injuries
+    const riskHTML = renderInjuries(tb.injury_risk_assessment || {});
+    // Imaging
+    const imgHTML = (tb.recommended_imaging||[]).map(im => {
+        const uClass = im.urgency==='STAT'?'urgency-stat':im.urgency==='URGENT'?'urgency-urgent':'urgency-routine';
+        return `<tr><td>${im.type}</td><td>${im.region}</td><td class="${uClass}">${im.urgency}</td><td>${im.rationale||''}</td></tr>`;
+    }).join('');
+    // Sources
+    const srcHTML = (tb.sources||[]).map(s => `<span class="source-chip">📄 ${s}</span>`).join('');
+    // Context chunks
+    const ctxHTML = (tb.retrieved_context||[]).map(c => `<div class="chunk"><div class="chunk-source">${c.source} [${c.category}]</div>${escapeHtml(c.content).substring(0,300)}...</div>`).join('');
+
+    return `<div class="triage-card pulse">
+        <div class="triage-header ${color}">
+            <div class="triage-title-group">
+                <h3>🔴 SEVERE FALL ALERT — ${s.subject_id}</h3>
+                <p>${s.fall_type} (${s.impact_type}) • ${new Date(s.timestamp).toLocaleTimeString()} • ${tb.llm_used?'LLM-synthesized':'Template-based'}</p>
+            </div>
+            <div class="triage-severity ${color}">${color}</div>
+        </div>
+        <div class="triage-body">
+            <div class="metrics">
+                <div class="metric"><div class="metric-label">Lateral G-Force</div><div class="metric-value danger">${sev.lateral_g}<span class="metric-unit"> g</span></div></div>
+                <div class="metric"><div class="metric-label">Total G-Force</div><div class="metric-value danger">${sev.total_g}<span class="metric-unit"> g</span></div></div>
+                <div class="metric"><div class="metric-label">Rotation</div><div class="metric-value warning">${sev.rotation_speed}<span class="metric-unit"> rad/s</span></div></div>
+                <div class="metric"><div class="metric-label">Jerk</div><div class="metric-value">${sev.jerk}<span class="metric-unit"></span></div></div>
+                <div class="metric"><div class="metric-label">HR Δ</div><div class="metric-value danger">+${sev.heart_rate_delta}<span class="metric-unit"> bpm</span></div></div>
+                <div class="metric"><div class="metric-label">Direction</div><div class="metric-value" style="font-size:15px">${sev.impact_direction}</div></div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">⚡ Immediate Actions</div>
+                <ol class="action-list">${actionsHTML}</ol>
+            </div>
+
+            <div class="section">
+                <div class="section-title">🩺 Injury Risk Assessment</div>
+                <div class="injury-grid">${riskHTML}</div>
+            </div>
+
+            ${imgHTML ? `<div class="section">
+                <div class="section-title">📋 Recommended Imaging</div>
+                <table class="imaging-table"><thead><tr><th>Type</th><th>Region</th><th>Urgency</th><th>Rationale</th></tr></thead><tbody>${imgHTML}</tbody></table>
+            </div>` : ''}
+
+            <div class="section">
+                <div class="section-title">🚑 Transport</div>
+                <div class="transport-bar">
+                    <div class="icon">🚑</div>
+                    <div class="info"><h4>${tb.transport_priority}</h4><p>${tb.transport_notes}</p></div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">📚 Sources</div>
+                <div class="sources">${srcHTML}</div>
+            </div>
+
+            <div class="section">
+                <button class="context-toggle" onclick="toggleContext()">▸ Show Retrieved Context (${(tb.retrieved_context||[]).length} chunks)</button>
+                <div class="context-chunks" id="context-chunks">${ctxHTML}</div>
+            </div>
+        </div>
+    </div>`;
+}
+
+function renderInjuries(risk) {
+    const levels = [
+        {key:'high_probability', label:'High Probability', color:'var(--red)'},
+        {key:'moderate_probability', label:'Moderate', color:'var(--yellow)'},
+        {key:'low_probability', label:'Low Probability', color:'var(--text-muted)'}
+    ];
+    return levels.map(l => {
+        const items = risk[l.key] || [];
+        if (!items.length) return '';
+        return `<div class="injury-col"><h4><span class="dot" style="background:${l.color}"></span>${l.label}</h4><ul>${items.map(i=>`<li>${i}</li>`).join('')}</ul></div>`;
+    }).join('');
+}
+
+function toggleContext() {
+    const el = document.getElementById('context-chunks');
+    el.classList.toggle('visible');
+    const btn = el.previousElementSibling;
+    btn.textContent = el.classList.contains('visible') ? '▾ Hide Retrieved Context' : `▸ Show Retrieved Context`;
+}
+
+function escapeHtml(t) { const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
+
+// Poll for alerts
+async function loadAlerts() {
+    try {
+        const r = await fetch(`${API}/api/alerts`);
+        const d = await r.json();
+        // We keep local state, only useful on initial load
+    } catch {}
+}
+loadAlerts();
+</script>
+</body>
+</html>
