@@ -50,7 +50,7 @@ services:
       - KAFKA_BROKER=kafka:9092
       - KAFKA_TOPIC=imu-data
       - DATASET_DIR=/app/dataset
-      - SEND_INTERVAL=3
+      - SEND_INTERVAL=1
     restart: on-failure
 
   # ── Step 1: Spark Inference Job (Rohan) ─────────────────────────
@@ -81,6 +81,8 @@ services:
       dockerfile: docker/dashboard/Dockerfile
     ports:
       - "5050:5050"
+    volumes:
+      - ./dashboard:/app/dashboard
     environment:
       - FLASK_ENV=production
     restart: on-failure

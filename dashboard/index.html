@@ -384,10 +384,20 @@ async function loadAlerts() {
     try {
         const r = await fetch(`${API}/api/alerts`);
         const d = await r.json();
-        // We keep local state, only useful on initial load
-    } catch {}
+        
+        if (d.count > alertsData.length) {
+            const newSummaries = d.alerts.slice(0, d.count - alertsData.length);
+            for (let s of newSummaries.reverse()) {
+                const detailReq = await fetch(`${API}/api/alerts/${s.alert_id}`);
+                const fullAlert = await detailReq.json();
+                alertsData.unshift(fullAlert);
+            }
+            renderAlertList();
+        }
+    } catch(e) { console.error("Polling error:", e); }
 }
 loadAlerts();
+setInterval(loadAlerts, 3000);
 </script>
 </body>
 </html>
